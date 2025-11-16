@@ -1,1 +1,1031 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>単語クイズ</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/wanakana/wanakana.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --duo-green: #58cc02;
+      --duo-green-dark: #58a700;
+      --duo-blue: #1cb0f6;
+      --duo-blue-dark: #1899d6;
+      --duo-red: #ea2b2b;
+      --duo-red-dark: #c82424;
+      --duo-yellow-light: rgba(254, 219, 0, 0.1);
+      --duo-green-light: rgba(88, 204, 2, 0.15);
+      --duo-blue-light: rgba(28, 176, 246, 0.1);
+      --duo-gray-light: #f7f7f7;
+      --duo-gray-border: #e5e5e5;
+      --white: #ffffff;
+      --dark-text: #4c4c4c;
+    }
+    body {
+      font-family: 'Nunito', sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      color: var(--dark-text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+      background-color: var(--duo-gray-light);
+      background-image:
+        radial-gradient(circle 50vmax at 10% 20%, var(--duo-green-light), transparent 50%),
+        radial-gradient(circle 40vmax at 90% 85%, var(--duo-blue-light), transparent 50%),
+        radial-gradient(circle 35vmax at 50% 50%, var(--duo-yellow-light), transparent 45%);
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+    }
+    header {
+      background: var(--duo-green);
+      padding: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid var(--duo-gray-border);
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #title {
+      flex-grow: 1;
+      text-align: center;
+      font-size: 32px;
+      font-weight: 900;
+      font-style: italic;
+      color: var(--white);
+      text-shadow: 2px 2px 0 rgba(0,0,0,0.1);
+    }
+    .quiz-container {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 40px;
+      background: var(--white);
+      border-radius: 16px;
+      border: 2px solid var(--duo-gray-border);
+      opacity: 0;
+    }
+    .animate-in { animation: fadeInUp 0.5s 0.1s ease-out forwards; }
+    .feedback-animate { animation: popIn 0.4s ease-out forwards; }
+    .quiz-container { width: 100%; min-height: 550px; box-sizing: border-box; }
+    .input-field {
+      margin: 10px;
+      padding: 10px 15px;
+      font-size: 20px;
+      font-weight: 700;
+      width: 250px;
+      border: 2px solid var(--duo-gray-border);
+      border-radius: 12px;
+      transition: all 0.2s ease;
+    }
+    .input-field:focus { outline: none; border-color: var(--duo-blue); }
+    .input-field:disabled { background-color: #f2f2f2; color: #999; }
+    .button {
+      position: relative;
+      margin: 10px 5px;
+      padding: 12px 24px;
+      font-size: 18px;
+      font-weight: 900;
+      text-transform: uppercase;
+      cursor: pointer;
+      border: none;
+      border-radius: 16px;
+      color: white;
+      transition: top 0.1s ease, background 0.2s ease;
+    }
+    .button.btn-green { background: var(--duo-green); border-bottom: 4px solid var(--duo-green-dark); }
+    .button.btn-blue { background: var(--duo-blue); border-bottom: 4px solid var(--duo-blue-dark); }
+    .button.btn-red { background: var(--duo-red); border-bottom: 4px solid var(--duo-red-dark); }
+    .button:active { top: 2px; border-bottom-width: 2px; }
+    .button:disabled { background: #ccc; border-bottom: 4px solid #999; cursor: not-allowed; top: 0; }
+    .button:disabled:active { top: 0; border-bottom-width: 4px; }
+    #header-buttons-container { display: flex; flex-direction: column; align-items: flex-end; }
+    #header-buttons-container div { margin-bottom: 5px; }
+    #header-buttons-container div:last-child { margin-bottom: 0; }
+    #toggleHistoryBtn { display: inline-block; }
+    .hidden { display: none; }
+    #question { font-size: 28px; font-weight: 900; margin-bottom: 15px; }
+    #translation { font-size: 18px; margin-top: 20px; line-height: 1.6; }
+    #input-wrapper { position: relative; min-height: 60px; margin: 20px 0; }
+    #feedback {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(160px, -50%);
+      width: 200px;
+      text-align: left;
+      font-size: 24px;
+      font-weight: 900;
+      opacity: 0;
+    }
+    #feedback.correct { color: var(--duo-green); }
+    #feedback.incorrect { color: var(--duo-red); }
+    .progress-bar {
+      height: 20px;
+      background-color: var(--duo-gray-border);
+      border-radius: 10px;
+      margin-top: 20px;
+      overflow: hidden;
+      padding: 4px;
+    }
+    .progress {
+      height: 100%;
+      width: 0%;
+      background: var(--duo-green);
+      border-radius: 8px;
+      transition: width 0.4s ease-in-out;
+      box-shadow: inset 0 2px 0 rgba(255,255,255,0.2);
+    }
+    #history-container {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      max-height: 250px;
+      overflow-y: auto;
+      background-color: var(--white);
+      border-top: 2px solid var(--duo-gray-border);
+      padding: 10px;
+      box-sizing: border-box;
+      text-align: left;
+      transform: translateY(100%);
+      transition: transform 0.3s ease-in-out;
+      z-index: 100;
+    }
+    #history-container.show { transform: translateY(0); }
+    #history-container h2 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      text-align: center;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: 900;
+    }
+    #history-list { list-style: none; padding: 0; margin: 0; }
+    #history-list li {
+      background-color: var(--white);
+      padding: 10px;
+      border-bottom: 1px solid var(--duo-gray-border);
+      font-size: 14px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    #history-list li:hover { background-color: var(--duo-gray-light); }
+    #clearHistoryBtn {
+      font-size: 12px;
+      padding: 4px 8px;
+      border: none;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-left: 15px;
+    }
+    #historySearchInput {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+    #closeHistoryBtn {
+      position: absolute;
+      top: 5px;
+      right: 10px;
+      font-size: 28px;
+      font-weight: bold;
+      color: #888;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+    }
+    #closeHistoryBtn:hover { color: #000; }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes popIn {
+      0% { transform: translate(160px, -50%) scale(0.8); opacity: 0; }
+      80% { transform: translate(160px, -50%) scale(1.1); opacity: 1; }
+      100% { transform: translate(160px, -50%) scale(1); opacity: 1; }
+    }
+    @media (max-width: 768px) {
+      body { padding-bottom: 10px; }
+      header { flex-direction: column; padding: 10px 5px; }
+      #title { font-size: 22px; margin-bottom: 10px; }
+      #header-buttons-container { align-items: center; }
+      .button { padding: 10px 12px; font-size: 14px; }
+      .quiz-container { width: 95%; margin: 15px auto; padding: 20px; min-height: 0; }
+      .input-field { width: 90%; box-sizing: border-box; font-size: 18px; }
+      #question { font-size: 22px; }
+      #feedback { position: static; transform: none; text-align: center; width: 100%; margin-top: 10px; font-size: 20px; }
+      @keyframes popIn {
+          0% { transform: scale(0.8); opacity: 0; }
+          80% { transform: scale(1.1); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+      }
+      #input-wrapper { min-height: 0; display: flex; flex-direction: column; align-items: center; }
+      #history-container { max-height: 40%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div id="title">Vocabulary Quiz</div>
+    <div id="header-buttons-container">
+      <div id="top-row-buttons">
+        <button class="button btn-blue" id="toggleHistoryBtn">履歴</button>
+        <button class="button btn-blue hidden" id="backToStartBtn">最初に戻る</button>
+        <button class="button btn-blue hidden" id="retryBtn">間違えた問題に再挑戦</button>
+      </div>
+      <div id="bottom-row-buttons">
+        <button class="button btn-blue hidden" id="pdfBtn">PDFをダウンロード</button>
+        <button class="button btn-blue hidden" id="wrongPdfBtn">間違えた単語をPDF化</button>
+        <button class="button btn-blue hidden" id="downloadAllBtn">全単語リストをPDF化</button>
+      </div>
+    </div>
+  </header>
 
+  <div class="quiz-container animate-in">
+    <div id="question"></div>
+    <div id="input-wrapper">
+      <div id="inputs"></div>
+      <div id="feedback"></div>
+    </div>
+    <button class="button btn-green" id="submitBtn">決定</button>
+    <button class="button btn-blue hidden" id="prevBtn">前へ</button>
+    <button class="button btn-green hidden" id="nextBtn">次へ</button>
+    <button class="button btn-blue hidden" id="showAllBtn">結果をすべて表示</button>
+    <div id="translation"></div>
+    <div class="progress-bar" id="progressBar">
+      <div class="progress" id="progress"></div>
+    </div>
+    <div id="scoreBoard"></div>
+  </div>
+
+  <div id="history-container">
+    <button id="closeHistoryBtn" title="閉じる">&times;</button>
+    <h2>プレイ履歴<button id="clearHistoryBtn" class="button btn-red">全て消去</button></h2>
+    <input type="search" id="historySearchInput" placeholder="名前や日付で履歴を検索...">
+    <ul id="history-list"></ul>
+  </div>
+
+  <script>
+    let allQuestions = [
+  {
+    "sentence": "His spending was so e__________ that he quickly ran out of money.",
+    "answers": ["extravagant"],
+    "meaning": ["too much"]
+  },
+  {
+    "sentence": "Adding three more speakers to the event would be o______.",
+    "answers": ["overkill"],
+    "meaning": ["excessive"]
+  },
+  {
+    "sentence": "They decided to t___ d____ the old building next year.",
+    "answers": ["tear down"],
+    "meaning": ["destroy"]
+  },
+  {
+    "sentence": "She succeeded s______ because she never gave up.",
+    "answers": ["solely"],
+    "meaning": ["simply"]
+  },
+  {
+    "sentence": "The teacher tried to i________ a class debate to get students thinking.",
+    "answers": ["instigate"],
+    "meaning": ["begin / start"]
+  },
+  {
+    "sentence": "He improved his English a_ t__ e______ o_ his free time.",
+    "answers": ["at the expense of"],
+    "meaning": ["at the sacrifice of"]
+  },
+  {
+    "sentence": "She s______ o__ the incorrect sentence.",
+    "answers": ["struck out"],
+    "meaning": ["delete"]
+  },
+  {
+    "sentence": "Many people were a________ by the heavy flood last month.",
+    "answers": ["afflicted"],
+    "meaning": ["suffering"]
+  },
+  {
+    "sentence": "Her comments gave me new i______ into the problem.",
+    "answers": ["insight"],
+    "meaning": ["perception"]
+  },
+  {
+    "sentence": "A_ s_____ earlier, the data is not reliable.",
+    "answers": ["as shown"],
+    "meaning": ["as mentioned earlier"]
+  },
+  {
+    "sentence": "The f____________ of the company hurt productivity.",
+    "answers": ["fragmentation"],
+    "meaning": ["break into pieces"]
+  },
+  {
+    "sentence": "He argued v___________ against the unfair policy.",
+    "answers": ["vehemently"],
+    "meaning": ["very strongly"]
+  },
+  {
+    "sentence": "Her arrival was the c_______ for major changes.",
+    "answers": ["catalyst"],
+    "meaning": ["trigger / cause"]
+  },
+  {
+    "sentence": "The decision had serious r____________ that no one expected.",
+    "answers": ["ramifications"],
+    "meaning": ["result"]
+  },
+  {
+    "sentence": "He forgot his passport, t_______ missing the flight.",
+    "answers": ["thereby"],
+    "meaning": ["as a result"]
+  },
+  {
+    "sentence": "Pollution is i__________ many ocean species.",
+    "answers": ["imperiling"],
+    "meaning": ["putting in danger"]
+  },
+  {
+    "sentence": "Constant rain caused soil d___________ in the area.",
+    "answers": ["degradation"],
+    "meaning": ["damaged"]
+  },
+  {
+    "sentence": "The mountain k____ offered snacks and maps to hikers.",
+    "answers": ["kiosk"],
+    "meaning": ["small booth where people live"]
+  },
+  {
+    "sentence": "He feels exhausted from living such a h_____ l___ lately.",
+    "answers": ["hectic life"],
+    "meaning": ["busy life"]
+  },
+  {
+    "sentence": "Housing prices have become too s_____ for young families.",
+    "answers": ["steep"],
+    "meaning": ["too high"]
+  },
+  {
+    "sentence": "We need to c__ b___ on expenses this month.",
+    "answers": ["cut back"],
+    "meaning": ["reduce"]
+  },
+  {
+    "sentence": "The new policy applies a______ t__ b_____.",
+    "answers": ["across the board"],
+    "meaning": ["everywhere"]
+  },
+  {
+    "sentence": "If you don’t sleep enough, you will feel d______ tired tomorrow.",
+    "answers": ["doubly"],
+    "meaning": ["in two ways"]
+  },
+  {
+    "sentence": "A service fee was t______ o___ the final bill.",
+    "answers": ["tacked onto"],
+    "meaning": ["added"]
+  },
+  {
+    "sentence": "Remember, b_____ s___ t___ s_____, especially when traveling.",
+    "answers": ["better safe than sorry"],
+    "meaning": ["better to be careful now than later"]
+  },
+  {
+    "sentence": "She was r________ to join the discussion at first.",
+    "answers": ["reluctant"],
+    "meaning": ["unwilling"]
+  },
+  {
+    "sentence": "We have s____ information about the missing files.",
+    "answers": ["scant"],
+    "meaning": ["little"]
+  },
+  {
+    "sentence": "The students were highly r__________ to new ideas.",
+    "answers": ["receptive"],
+    "meaning": ["open minded"]
+  },
+  {
+    "sentence": "The movie has a m___________ ending that made everyone cry.",
+    "answers": ["melancholic"],
+    "meaning": ["feeling sadness"]
+  },
+  {
+    "sentence": "Modern cities are fully w_____ with high-speed internet.",
+    "answers": ["wired"],
+    "meaning": ["making use of computers to transfer or receive information"]
+  },
+  {
+    "sentence": "The r_________ of the award thanked everyone sincerely.",
+    "answers": ["recipient"],
+    "meaning": ["receiver gifted"]
+  },
+  {
+    "sentence": "The company had a d______ year, with many losses.",
+    "answers": ["dismal"],
+    "meaning": ["lack of success"]
+  },
+  {
+    "sentence": "They invested in several high-risk v_______ last year.",
+    "answers": ["ventures"],
+    "meaning": ["enterprise projects (risky ones)"]
+  },
+  {
+    "sentence": "The judge made an i________ decision based on evidence.",
+    "answers": ["impartial"],
+    "meaning": ["neutral"]
+  },
+  {
+    "sentence": "She spoke in a d___________ manner to her professor.",
+    "answers": ["deferential"],
+    "meaning": ["respectful"]
+  },
+  {
+    "sentence": "The group shared s__________ ideas that challenged authority.",
+    "answers": ["subversive"],
+    "meaning": ["destructive"]
+  },
+  {
+    "sentence": "The court issued a l________ o_______ that changed the law.",
+    "answers": ["landmark opinion"],
+    "meaning": ["a court decision"]
+  },
+  {
+    "sentence": "Trust is an i_______ part of any strong relationship.",
+    "answers": ["integral"],
+    "meaning": ["essential"]
+  },
+  {
+    "sentence": "The team reached a c________ after hours of discussion.",
+    "answers": ["consensus"],
+    "meaning": ["a general agreement"]
+  },
+  {
+    "sentence": "The soldiers will r_____ if their leader calls them back.",
+    "answers": ["rally"],
+    "meaning": ["come together again after a defeat"]
+  },
+  {
+    "sentence": "Her dress was so c__________ that everyone noticed her immediately.",
+    "answers": ["conspicuous"],
+    "meaning": ["easily seen or noticed"]
+  },
+  {
+    "sentence": "The teacher gave a l____ explanation of the theory.",
+    "answers": ["lucid"],
+    "meaning": ["easy to understand"]
+  },
+  {
+    "sentence": "The i_______ explorer crossed the desert alone.",
+    "answers": ["intrepid"],
+    "meaning": ["fearless"]
+  },
+  {
+    "sentence": "His reaction was so s_____ that I barely noticed it.",
+    "answers": ["subtle"],
+    "meaning": ["hard to describe"]
+  },
+  {
+    "sentence": "His i____________ hurt many people in the group.",
+    "answers": ["insensitivity"],
+    "meaning": ["lack of feeling or concern for others"]
+  },
+  {
+    "sentence": "The workers lived on a large p__________ outside the city.",
+    "answers": ["plantation"],
+    "meaning": ["a large farm"]
+  },
+  {
+    "sentence": "She was deeply g______ by the sudden loss.",
+    "answers": ["grieved"],
+    "meaning": ["upset"]
+  },
+  {
+    "sentence": "We reached the beach just as d___ was breaking.",
+    "answers": ["dawn"],
+    "meaning": ["sunrise"]
+  },
+  {
+    "sentence": "The children ran g_____ through the park.",
+    "answers": ["gaily"],
+    "meaning": ["brightly"]
+  },
+  {
+    "sentence": "He grabbed a r__ to clean the spilled juice.",
+    "answers": ["rag"],
+    "meaning": ["cloth used for cleaning"]
+  },
+  {
+    "sentence": "Rice is a good s__________ when you run out of pasta.",
+    "answers": ["substitute"],
+    "meaning": ["alternative"]
+  },
+  {
+    "sentence": "Strong winds helped p______ the boat forward.",
+    "answers": ["propel"],
+    "meaning": ["push toward"]
+  },
+  {
+    "sentence": "Scientists continue to explore the f________ of space.",
+    "answers": ["frontiers"],
+    "meaning": ["new area of knowledge"]
+  },
+  {
+    "sentence": "Ethical questions are central to e_______ behavior.",
+    "answers": ["ethnical"],
+    "meaning": ["related to what is right or wrong morally as a human"]
+  }
+];
+
+    allQuestions.forEach(q => {
+      // Correctly replace the blank hint (e.g., "M______") with the full answer to create the translation.
+      const blankRegex = /[A-Z]______/;
+      if (q.sentence.includes("______")) {
+          q.translation = q.sentence.replace(blankRegex, q.answers[0]);
+      } else {
+          // Fallback for different blank formats if needed
+          q.translation = q.sentence;
+      }
+      q.blanksTranslation = q.meaning;
+    });
+
+    let playerName = 'Guest';
+    let questions = [];
+    let current = 0, score = 0;
+    let lastAnsweredIndex = -1;
+    let userAnswers = [], incorrectQuestions = [], retryMode = false, wrongAnswers = [];
+    let keyupLock = false;
+    let titleClickCount = 0;
+    let titleClickTimer = null;
+
+    const header = document.querySelector("header");
+    const quizContainer = document.querySelector(".quiz-container");
+    const mainTitle = document.getElementById("title");
+    const qEl = document.getElementById("question");
+    const inputEl = document.getElementById("inputs");
+    const feedbackEl = document.getElementById("feedback");
+    const translationEl = document.getElementById("translation");
+    const scoreBoard = document.getElementById("scoreBoard");
+    const pdfBtn = document.getElementById("pdfBtn");
+    const wrongPdfBtn = document.getElementById("wrongPdfBtn");
+    const retryBtn = document.getElementById("retryBtn");
+    const showAllBtn = document.getElementById("showAllBtn");
+    const submitBtn = document.getElementById("submitBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const progressBar = document.getElementById("progressBar");
+    const progressEl = document.getElementById("progress");
+    const downloadAllBtn = document.getElementById("downloadAllBtn");
+    const backToStartBtn = document.getElementById("backToStartBtn");
+    const prevBtn = document.getElementById("prevBtn");
+    const toggleHistoryBtn = document.getElementById("toggleHistoryBtn");
+    const historyContainer = document.getElementById("history-container");
+    const clearHistoryBtn = document.getElementById("clearHistoryBtn");
+    const historySearchInput = document.getElementById("historySearchInput");
+    const closeHistoryBtn = document.getElementById("closeHistoryBtn");
+
+    function loadQuestion() {
+      quizContainer.classList.remove('animate-in');
+      void quizContainer.offsetWidth;
+      quizContainer.classList.add('animate-in');
+      retryBtn.classList.add("hidden");
+      prevBtn.classList.add("hidden");
+      nextBtn.classList.add("hidden");
+      showAllBtn.classList.add("hidden");
+      qEl.style.marginBottom = "";
+      translationEl.style.marginTop = "";
+      const q = questions[current];
+      
+      qEl.innerHTML = `<div>Q${current + 1} / ${questions.length}: ${q.sentence}</div>`;
+
+      inputEl.innerHTML = "";
+      feedbackEl.textContent = "";
+      feedbackEl.classList.remove('feedback-animate');
+      translationEl.textContent = "";
+      q.answers.forEach((_, i) => {
+        const inp = document.createElement("input");
+        inp.type = "text";
+        inp.className = "input-field";
+        inp.id = "ans" + i;
+        inputEl.appendChild(inp);
+      });
+      const inputs = document.querySelectorAll(".input-field");
+      inputs[0].focus();
+      inputs.forEach((inp, idx) => {
+        inp.addEventListener("keydown", e => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            if (idx < inputs.length - 1) {
+              inputs[idx + 1].focus();
+            } else {
+              keyupLock = true;
+              checkAnswer();
+            }
+          }
+        });
+      });
+      if (userAnswers[current]) {
+        inputs.forEach((inp, i) => {
+          inp.value = userAnswers[current].user[i] || "";
+        });
+      }
+      submitBtn.classList.remove("hidden");
+      const progressPercentage = (questions.length > 1) ? Math.round((current / (questions.length)) * 100) : 0;
+      progressEl.style.width = `${progressPercentage}%`;
+    }
+
+    function recalculateScore() {
+      score = userAnswers.filter(answer => {
+        if (!answer) return false;
+        const q = allQuestions.find(q => q.sentence === answer.question);
+        if (!q) return false;
+        return answer.user.every((userAns, i) => (userAns || "").toLowerCase().trim() === (q.answers[i] || "").toLowerCase().trim());
+      }).length;
+    }
+
+    function checkAnswer() {
+      const q = questions[current];
+      let correct = true, answersGiven = [];
+      q.answers.forEach((ans, i) => {
+        const userAns = document.getElementById("ans" + i).value.trim();
+        answersGiven.push(userAns);
+        if (userAns.toLowerCase() !== ans.toLowerCase()) correct = false;
+      });
+      userAnswers[current] = { question: q.sentence, user: answersGiven };
+      if (!retryMode) {
+        recalculateScore();
+      }
+      if (!correct) {
+        if (!incorrectQuestions.some(item => item.sentence === q.sentence)) incorrectQuestions.push(q);
+        if (!wrongAnswers.some(item => item.sentence === q.sentence)) wrongAnswers.push(q);
+      } else {
+        incorrectQuestions = incorrectQuestions.filter(item => item.sentence !== q.sentence);
+        // Do not remove from wrongAnswers, as it's used for the "Download Wrong PDF" for the session
+      }
+      lastAnsweredIndex = Math.max(lastAnsweredIndex, current);
+      displayAnsweredQuestion(current);
+    }
+
+    function loadNextNewQuestion() {
+      current++;
+      if (current < questions.length) {
+          loadQuestion();
+      } else {
+          showAllResults();
+      }
+    }
+
+    function displayAnsweredQuestion(index) {
+      current = index;
+      const q = questions[index];
+      const recordedEntry = userAnswers[index];
+      qEl.innerHTML = `<div>Q${current + 1} / ${questions.length}: ${q.sentence}</div>`;
+      inputEl.innerHTML = "";
+      q.answers.forEach((_, i) => {
+        const inp = document.createElement("input");
+        inp.type = "text";
+        inp.className = "input-field";
+        inp.id = "ans" + i;
+        inputEl.appendChild(inp);
+      });
+      const inputs = inputEl.querySelectorAll(".input-field");
+      inputs.forEach((inp, i) => {
+        inp.value = recordedEntry.user[i] || "";
+        inp.disabled = true;
+        const wasThisPartCorrect = (recordedEntry.user[i] || "").toLowerCase().trim() === (q.answers[i] || "").toLowerCase().trim();
+        inp.style.borderColor = wasThisPartCorrect ? 'var(--duo-green)' : 'var(--duo-red)';
+        inp.style.borderWidth = '2px';
+      });
+      submitBtn.classList.add("hidden");
+      const userWasCorrect = recordedEntry.user.every((ans, i) => (ans || "").toLowerCase().trim() === (q.answers[i] || "").toLowerCase().trim());
+      feedbackEl.className = "feedback-animate";
+      feedbackEl.textContent = userWasCorrect ? "✅ 正解！" : "❌ 不正解";
+      feedbackEl.classList.add(userWasCorrect ? "correct" : "incorrect");
+      let highlighted = q.translation;
+      q.answers.forEach(ans => {
+        highlighted = highlighted.replace(new RegExp(`\\b${ans}\\b`, "gi"), `<span style="font-weight: 900; color: red;">${ans}</span>`);
+      });
+
+      translationEl.innerHTML = `
+        <p><b>正解の文章:</b> ${highlighted}</p>
+        <p><b>答え:</b> ${q.answers.join(", ")}</p>
+        <p><b>答えの意味:</b> ${q.blanksTranslation.join(", ")}</p>
+      `;
+      
+      const progressPercentage = (questions.length > 0) ? Math.round(((current + 1) / questions.length) * 100) : 0;
+      progressEl.style.width = `${progressPercentage}%`;
+
+
+      const isLastQuestion = index === questions.length - 1;
+      prevBtn.classList.toggle("hidden", index <= 0);
+      showAllBtn.classList.toggle("hidden", !isLastQuestion);
+      nextBtn.classList.toggle("hidden", isLastQuestion);
+
+    }
+
+    function goToPreviousQuestion() {
+      if (current > 0) {
+        displayAnsweredQuestion(current - 1);
+      }
+    }
+
+    function handleNextClick() {
+      if (current < lastAnsweredIndex) {
+        displayAnsweredQuestion(current + 1);
+      } else {
+        loadNextNewQuestion();
+      }
+    }
+
+    function showAllResults() {
+      progressBar.classList.add("hidden");
+      recalculateScore();
+      const finalScoreText = retryMode ? `${score} / ${questions.length}` : `${score} / ${allQuestions.length}`;
+      savePlayHistory(playerName, finalScoreText);
+      displayPlayHistory();
+      scoreBoard.textContent = `スコア: ${finalScoreText}`;
+      qEl.textContent = "全結果";
+      inputEl.innerHTML = "";
+      feedbackEl.textContent = "";
+      translationEl.innerHTML = "";
+      qEl.style.marginBottom = "0";
+      translationEl.style.marginTop = "5px";
+      translationEl.innerHTML = `<p style="margin: 0;"><b>名前:</b> ${playerName}</p><p><b>スコア:</b> ${finalScoreText}</p>`;
+      questions.forEach((question, idx) => {
+        const entry = userAnswers[idx];
+        if (!entry) return;
+        const originalQuestion = allQuestions.find(q => q.sentence === entry.question);
+        if (!originalQuestion) return;
+        let highlightedSentence = originalQuestion.translation;
+        originalQuestion.answers.forEach(ans => {
+          highlightedSentence = highlightedSentence.replace(new RegExp(`\\b(${ans})\\b`, 'gi'), `<span style="font-weight: 900; color: red;">$1</span>`);
+        });
+        const userAnswersGiven = entry.user.join(", ");
+        const isAnswerCorrect = entry.user.every((ans, i) => (ans || "").toLowerCase().trim() === (originalQuestion.answers[i] || "").toLowerCase().trim());
+        let yourAnswerHTML = isAnswerCorrect ? `<p style="margin: 5px 0;"><b>あなたの回答:</b> ${userAnswersGiven} <span style="color: var(--duo-green);">✅</span></p>` : `<p style="margin: 5px 0;"><b>あなたの回答:</b> <span style="color: var(--duo-red);">${userAnswersGiven || "(無回答)"}</span> ❌</p>`;
+        const div = document.createElement("div");
+        div.style.cssText = "text-align: left; margin: 15px 10px; border-bottom: 1px solid #eee; padding-bottom: 10px;";
+        div.innerHTML = `<p style="margin: 5px 0;"><b>Q${idx + 1}:</b> ${highlightedSentence}</p>${yourAnswerHTML}`;
+        translationEl.appendChild(div);
+      });
+      pdfBtn.classList.remove("hidden");
+      backToStartBtn.classList.remove("hidden");
+      downloadAllBtn.classList.remove("hidden");
+      if (wrongAnswers.length > 0) wrongPdfBtn.classList.remove("hidden");
+      if (incorrectQuestions.length > 0) {
+        retryBtn.textContent = `間違えた ${incorrectQuestions.length} 問に再挑戦`;
+        retryBtn.classList.remove("hidden");
+      } else {
+        retryBtn.classList.add("hidden");
+      }
+      showAllBtn.classList.add("hidden");
+      nextBtn.classList.add("hidden");
+      prevBtn.classList.add("hidden");
+    }
+
+    function savePlayHistory(name, scoreText) {
+      const date = new Date();
+      const formattedDate = `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+      const newRecord = { name, score: scoreText, date: formattedDate, results: JSON.parse(JSON.stringify(userAnswers)), questions: questions.map(q => q.sentence) };
+      const history = JSON.parse(localStorage.getItem('quizPlayHistory')) || [];
+      history.unshift(newRecord);
+      localStorage.setItem('quizPlayHistory', JSON.stringify(history));
+    }
+
+    function displayPlayHistory(searchTerm = '') {
+      let history = JSON.parse(localStorage.getItem('quizPlayHistory')) || [];
+      const historyList = document.getElementById('history-list');
+      const lowerCaseSearchTerm = searchTerm.toLowerCase();
+      if (lowerCaseSearchTerm) {
+        history = history.filter(record => `[${record.date}] ${record.name} - スコア: ${record.score}`.toLowerCase().includes(lowerCaseSearchTerm));
+      }
+      historyList.innerHTML = '';
+      history.forEach(record => {
+        const listItem = document.createElement('li');
+        listItem.textContent = `[${record.date}] ${record.name} - スコア: ${record.score}`;
+        listItem.title = 'この結果をPDFでダウンロード';
+        listItem.addEventListener('click', () => downloadHistoryPDF(record));
+        historyList.appendChild(listItem);
+      });
+    }
+
+    function initQuiz() {
+      playerName = prompt("クイズを始める前に、あなたの名前を入力してください:", "Guest") || "Guest";
+      mainTitle.textContent = `${playerName}の単語クイズ`;
+      lastAnsweredIndex = -1; score = 0; userAnswers = []; incorrectQuestions = []; wrongAnswers = [];
+      questions = [...allQuestions];
+      shuffle(questions);
+      current = 0;
+      loadQuestion();
+    }
+
+    function restartQuiz() { window.location.reload(); }
+
+    function retryIncorrect() {
+      if (incorrectQuestions.length === 0) return;
+      lastAnsweredIndex = -1; score = 0; userAnswers = []; 
+      // Keep wrongAnswers for final PDF
+      questions = [...incorrectQuestions];
+      incorrectQuestions = []; // Reset for the retry session
+      retryMode = true;
+      scoreBoard.textContent = "";
+      progressBar.classList.remove("hidden");
+      pdfBtn.classList.add("hidden");
+      wrongPdfBtn.classList.add("hidden");
+      retryBtn.classList.add("hidden");
+      backToStartBtn.classList.add("hidden");
+      downloadAllBtn.classList.add("hidden");
+      quizContainer.classList.remove("hidden");
+      header.classList.remove("hidden");
+      current = 0;
+      loadQuestion();
+    }
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+    
+    function downloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      let usernameForPdf = wanakana.isJapanese(playerName) ? wanakana.toRomaji(playerName) : playerName;
+      const finalScoreText = retryMode ? `${score} / ${questions.length}` : `${score} / ${allQuestions.length}`;
+      doc.setFontSize(14);
+      doc.text("Quiz Results", 10, 10);
+      if (usernameForPdf) doc.text(`Name: ${usernameForPdf}`, 10, 20);
+      doc.text(`Score: ${finalScoreText}`, 10, 30);
+      let y = 40;
+      questions.forEach((q, idx) => {
+          const entry = userAnswers[idx];
+          if (!entry) return;
+          const originalQuestion = allQuestions.find(q_orig => q_orig.sentence === entry.question);
+          if(!originalQuestion) return;
+          
+          const linesQ = doc.splitTextToSize(`Q${idx + 1}: ${originalQuestion.sentence}`, 180);
+          doc.text(linesQ, 10, y); y += linesQ.length * 7;
+          const linesU = doc.splitTextToSize(`Your Answer: ${entry.user.join(", ")}`, 180);
+          doc.text(linesU, 10, y); y += linesU.length * 7;
+          const linesC = doc.splitTextToSize(`Correct Answer: ${originalQuestion.answers.join(", ")}`, 180);
+          doc.text(linesC, 10, y); y += linesC.length * 7 + 5;
+          if (y > 270) { doc.addPage(); y = 20; }
+      });
+      doc.save("quiz_results.pdf");
+    }
+
+    function downloadWrongPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.setFontSize(14);
+      doc.text("Wrong Vocabulary Results", 10, 10);
+      let y = 20;
+      wrongAnswers.forEach((q, idx) => {
+        const linesQ = doc.splitTextToSize(`${idx + 1}. ${q.sentence}`, 180);
+        doc.text(linesQ, 10, y); y += linesQ.length * 8;
+        const linesA = doc.splitTextToSize(`Answer: ${q.answers.join(", ")}`, 180);
+        doc.text(linesA, 10, y); y += linesA.length * 8 + 5;
+        if (y > 270) { doc.addPage(); y = 20; }
+      });
+      doc.save("Wrong-vocab.pdf");
+    }
+
+    function downloadHistoryPDF(historyRecord) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      let usernameForPdf = wanakana.isJapanese(historyRecord.name) ? wanakana.toRomaji(historyRecord.name) : historyRecord.name;
+      doc.setFontSize(16);
+      doc.text("Quiz Results", 105, 15, null, null, "center");
+      doc.setFontSize(12);
+      doc.text(`Name: ${usernameForPdf}`, 10, 25);
+      doc.text(`Score: ${historyRecord.score}`, 10, 32);
+      doc.text(`Date: ${historyRecord.date}`, 10, 39);
+      let y = 50;
+      
+      const recordQuestions = historyRecord.questions.map(sentence => allQuestions.find(q => q.sentence === sentence));
+
+      recordQuestions.forEach((originalQuestion, idx) => {
+          const entry = historyRecord.results[idx];
+          if (!entry || !originalQuestion) return;
+
+          if (y > 270) {
+              doc.addPage();
+              y = 20;
+          }
+          const isCorrect = entry.user.every((ans, i) => (ans || "").toLowerCase().trim() === (originalQuestion.answers[i] || "").toLowerCase().trim());
+          doc.setFontSize(12);
+          doc.text(`Q${idx + 1}: ${originalQuestion.sentence}`, 10, y); y += 7;
+          doc.setFontSize(10);
+          doc.setTextColor(isCorrect ? '#28a745' : '#dc3545');
+          doc.text(`Your Answer: ${entry.user.join(", ") || "(no answer)"}`, 15, y); y += 7;
+          if (!isCorrect) {
+              doc.setTextColor('#333333');
+              doc.text(`Correct Answer: ${originalQuestion.answers.join(", ")}`, 15, y); y += 7;
+          }
+          y += 5;
+      });
+      const datePart = historyRecord.date.replace(/[/:\s]/g, '-');
+      const namePart = usernameForPdf.replace(/\s/g, '_');
+      doc.save(`${datePart}-${namePart}.pdf`);
+    }
+
+    function downloadAllQuestionsPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text("Vocabulary List", 10, 15);
+      let y = 25;
+      doc.setFontSize(12);
+      allQuestions.forEach((q, idx) => {
+        if (y > 270) { doc.addPage(); y = 20; }
+        
+        let replacedSentence = q.translation;
+        
+        const linesQ = doc.splitTextToSize(`${idx + 1}. ${replacedSentence}`, 180);
+        doc.text(linesQ, 10, y);
+        y += linesQ.length * 7;
+        const linesM = doc.splitTextToSize(`   Meaning: ${q.meaning.join(", ")}`, 170);
+        doc.text(linesM, 15, y);
+        y += linesM.length * 7 + 5;
+      });
+      doc.save("Vocabulary-List.pdf");
+    }
+    
+    // --- Event Listeners ---
+    pdfBtn.onclick = downloadPDF;
+    wrongPdfBtn.onclick = downloadWrongPDF;
+    submitBtn.onclick = checkAnswer;
+    nextBtn.onclick = handleNextClick;
+    prevBtn.onclick = goToPreviousQuestion;
+    showAllBtn.onclick = showAllResults;
+    retryBtn.onclick = retryIncorrect;
+    downloadAllBtn.onclick = downloadAllQuestionsPDF;
+    backToStartBtn.onclick = restartQuiz;
+
+    toggleHistoryBtn.addEventListener('click', () => {
+      historyContainer.classList.toggle('show');
+    });
+
+    closeHistoryBtn.onclick = () => { historyContainer.classList.remove('show'); };
+
+    clearHistoryBtn.addEventListener('click', () => {
+      if (confirm('本当によろしいですか？すべての履歴が完全に削除されます。')) {
+        localStorage.removeItem('quizPlayHistory');
+        historySearchInput.value = '';
+        displayPlayHistory();
+        alert('履歴を削除しました。');
+      }
+    });
+
+    function secretClickHandler() {
+      titleClickCount++;
+      clearTimeout(titleClickTimer);
+      titleClickTimer = setTimeout(() => { titleClickCount = 0; }, 1500);
+      if (titleClickCount >= 5) {
+        titleClickCount = 0;
+        clearTimeout(titleClickTimer);
+        toggleHistoryBtn.click();
+      }
+    }
+
+    mainTitle.addEventListener('click', secretClickHandler);
+    
+    document.addEventListener('keyup', (event) => {
+      if (event.key !== 'Enter') return;
+      if (keyupLock) { keyupLock = false; return; }
+      if (document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'text') { return; }
+      if (!submitBtn.classList.contains('hidden')) { checkAnswer(); }
+      else if (!nextBtn.classList.contains('hidden')) { handleNextClick(); } 
+      else if (!showAllBtn.classList.contains('hidden')) { showAllResults(); }
+    });
+    
+    document.addEventListener('DOMContentLoaded', () => {
+      displayPlayHistory();
+      initQuiz();
+    });
+
+    historySearchInput.addEventListener('input', () => {
+      displayPlayHistory(historySearchInput.value);
+    });
+  </script>
+</body>
+</html>
